@@ -1,0 +1,2 @@
+FyrNode	KEYWORD1
+FyrNodeControl KEYWORD1
