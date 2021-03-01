@@ -1,22 +1,19 @@
-//*************************************************************
-//* Copyright (C) 2020 Manish Meganathan 757manish@gmail.com
-//* 
-//* This file is part of FyrWatch and FyrMesh.
-//* 
-//* FyrWatch can not be copied and/or distributed without the 
-//* express permission of Manish Meganathan and Mariyam A.Ghani
-//*************************************************************
-//*************************************************************
-// Code for control node to forward all recived messages to its
-// software serial port and to send ping request  to the mesh
-// when a button is pressed. 
+// ===========================================================================
+// Copyright (C) 2020 Manish Meganathan, Mariyam A.Ghani. All Rights Reserved.
+// 
+// This file is part of the FyrNode library.
+// No part of the FyrNode library can not be copied and/or distributed 
+// without the express permission of Manish Meganathan and Mariyam A.Ghani
+// ===========================================================================
+// Code for control node to forward all recived messages to its software serial 
+// port and to send ping request  to the mesh when a button is pressed. 
 //
 // Serial Baud Rate - 38400 (HW & SW Serial)
 // Software Serial Pins - D5, D6
 // Button is attached to D0 (PIN16)
 //
 // Written for NodeMCU 1.0 ESP-12E board
-//*************************************************************
+// ===========================================================================
 
 #include "painlessMesh.h"
 #include "SoftwareSerial.h"

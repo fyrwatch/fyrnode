@@ -1,12 +1,10 @@
-//*************************************************************
-//* Copyright (C) 2020 Manish Meganathan 757manish@gmail.com
-//* 
-//* This file is part of FyrWatch and FyrMesh.
-//* 
-//* FyrWatch can not be copied and/or distributed without the 
-//* express permission of Manish Meganathan and Mariyam A.Ghani
-//*************************************************************
-//*************************************************************
+// ===========================================================================
+// Copyright (C) 2020 Manish Meganathan, Mariyam A.Ghani. All Rights Reserved.
+// 
+// This file is part of the FyrNode library.
+// No part of the FyrNode library can not be copied and/or distributed 
+// without the express permission of Manish Meganathan and Mariyam A.Ghani
+// ===========================================================================
 // Code for node with a ping button, which when pressed
 // broadcasts a ping request to the mesh.
 //
@@ -15,7 +13,7 @@
 //
 // Disregard warning for JCButton library's compatibility.
 // Written for NodeMCU 1.0 ESP-12E board
-//*************************************************************
+// ===========================================================================
 
 #include "painlessMesh.h"
 #include "ArduinoJson.h"
