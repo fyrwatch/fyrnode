@@ -12,14 +12,19 @@
 An Arduino library that contains firmware code for sensor nodes and control nodes that run on the FyrMesh Platfrom. Contains abstraction tools to support a modular sensor hardware configurations, callbacks to support the painlessMesh library, loop runtimes to check button statuses and a custom message delivery protocol.  
 It is intended to be compatible with the *ESP8266 NodeMCU* boards.  
 
-The library is based on the [**painlessMesh**]("https://github.com/gmag11/painlessMesh) library that implements a mesh network of nodes based on the ESP8266 and ESP32 platforms. This library combines this functionality along with its custom JSON-based command messaging protocol and modular hardware configuration support to abstract the FyrMesh platforms requirements into a simple collection classes that achieve all the required functionality behind the scenes.
+The library is based on the [**painlessMesh**](https://github.com/gmag11/painlessMesh) library that implements a mesh network of nodes based on the ESP8266 and ESP32 platforms. This library combines this functionality along with its custom JSON-based command messaging protocol and modular hardware configuration support to abstract the FyrMesh platforms requirements into a simple collection classes that achieve all the required functionality behind the scenes.
+
+## Library Dependencies
+- [painlessMesh](https://github.com/gmag11/painlessMesh)
+- [ArduinoJSON](https://github.com/bblanchon/ArduinoJson)
+- [JC_Button](https://github.com/JChristensen/JC_Button)
 
 ## API
 The library contains two classes **FyrNode** and **FyrNodeControl**. They behave as the sensor nodes and the control node for the FyrMesh platform respectively. The hardware configuration of the node is specified using a collection of global values made available to the library using the ``extern`` keyword.
 
 This library while designed to be hackable and modular. Is intended to be used as is on the nodes themselves. The only level of customization on the nodes is expected to be with the configuration value set to support different types of hardware configurations. New functionality should be implemented directly into the library and not on the sketch file of the node.
 
-## ``FyrNode``
+### ``FyrNode``
 The ``FyrNode`` object is initialised as mentioned below. The hardware configuration is not specfied at the time of intialisation of this object, but is rather accessed from the collection of global variables. See more in the Hardware Configuration Section.
 ```
 FyrNode sensornode;
@@ -31,7 +36,7 @@ The ``FyrNode`` object has the following member methods.
 - ``update()``
   This method is used in the ``void loop()`` function of the Arduino Sketch. It runs the ``mesh.update()`` runtime in the backend along with checking for connection states, new messages and button states. 
 
-## ``FyrNodeControl``
+### ``FyrNodeControl``
 The ``FyrNodeControl`` object is initialised as mentioned below. The hardware configuration is not specfied at the time of intialisation of this object, but is rather accessed from the collection of global variables. See more in the Hardware Configuration Section.
 ```
 FyrNodeControl controlnode;
@@ -99,7 +104,7 @@ The configuration symbols are as follows:
 **D9  = 3**  
 **D10 = 1**  
 **A0  = 17**    
-*refer to [this](""https://github.com/esp8266/Arduino/blob/master/variants/nodemcu/pins_arduino.h) for more information about NodeMCU pins*  
+*refer to [this](https://github.com/esp8266/Arduino/blob/master/variants/nodemcu/pins_arduino.h) for more information about NodeMCU pins*  
 
 ## Example Sketch 
 An example program that uses the ``FyrNode`` class to define a sensor mesh that has DHT11 sensor attached at pin D1.
