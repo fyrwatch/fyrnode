@@ -1,13 +1,11 @@
 """
-*************************************************************
-* Copyright (C) 2020 Manish Meganathan 757manish@gmail.com
-* 
-* This file is part of FyrWatch and FyrMesh.
-* 
-* FyrWatch can not be copied and/or distributed without the 
-* express permission of Manish Meganathan and Mariyam A.Ghani
-*************************************************************
-*************************************************************
+===========================================================================
+Copyright (C) 2020 Manish Meganathan, Mariyam A.Ghani. All Rights Reserved.
+
+This file is part of the FyrNode library.
+No part of the FyrNode library can not be copied and/or distributed 
+without the express permission of Manish Meganathan and Mariyam A.Ghani
+===========================================================================
 Code for RaspberryPi to initialise a serial connection with 
 mesh control node and parse those messages into meaningful
 data and print it.
@@ -15,8 +13,8 @@ data and print it.
 Serial Baud Rate - 38400
 Serial Port - /dev/ttyAMA0
 
-Written for NodeMCU 1.0 ESP-12E board
-*************************************************************
+Written for Raspberry Pi 4B
+===========================================================================
 """
 
 import serial
