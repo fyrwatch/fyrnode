@@ -10,7 +10,6 @@
 #include "Arduino.h"
 #include "painlessMesh.h"
 #include "ArduinoJson.h"
-#include "SoftwareSerial.h"
 #include "JC_Button.h"
 #include "DHT.h"
 
@@ -30,16 +29,16 @@ extern int PINGERPIN;
 extern bool CONNECT;
 extern int CONNECTPIN;
 
-extern int SRLRX;
-extern int SRLTX;
+uint32_t CONTROLNODE = 0;
+bool MESHCONNECTED = false;
+bool MESHHANDSHAKE = false;
+int handshaketimer = 0;
 
 painlessMesh mesh;
-uint32_t CONTROLNODE;
 Scheduler meshScheduler;
 DHT dht(DHTPIN, DHTTYP);
 Button pingerbutton(PINGERPIN);
 Button connectbutton(CONNECTPIN);
-SoftwareSerial serialport(SRLRX, SRLTX);
 
 // A function to get sensor readings from the 
 // DHT Sensor and fill it into the JSON document
@@ -107,11 +106,67 @@ void requestPing(String &ping)
     serializeJson(message, msg);
     mesh.sendBroadcast(msg);
 
-    serialport.println("pingrequest was sent");
+    Serial.println("pingrequest was sent");
 }
 
-// Sensor Node Mesh Callback for recieved messages. 
-void sensornodeMessageRX(uint32_t from, String &recievedmsg) 
+// A function to respond to a 'handshakerequest' with a 'handshakeresponse'
+void respondHandShake(uint32_t from) 
+{
+    StaticJsonDocument<256> message;
+    
+    message["type"] = "handshakeresponse";
+    message["origin"] = mesh.getNodeId();
+
+    message["reach"]["type"] = "unicast";
+    message["reach"]["set"] = from;
+
+    message["data"]["message"] = "handshake acknowledged";
+    message["data"]["control"] = mesh.getNodeId();
+
+    String msg;
+    serializeJson(message, msg);
+    mesh.sendSingle(from, msg);
+}
+
+// A function to broadcast a 'handshakerequest'
+void requestHandShake()
+{
+    StaticJsonDocument<256> message;
+    
+    message["type"] = "handshakerequest";
+    message["origin"] = mesh.getNodeId();
+
+    message["reach"]["type"] = "broadcast";
+    message["reach"]["set"] = "null";
+
+    message["data"]["message"] = "handshake requested";
+
+    String msg;
+    serializeJson(message, msg);
+
+    Serial.println("handshake request runtime intiated");
+    Serial.println(msg);
+
+    mesh.sendBroadcast(msg);
+}
+
+// Control Node Mesh Callback for recieved messages. 
+void messageRXControl(uint32_t from, String &recievedmsg) 
+{
+    Serial.println(recievedmsg);
+
+    StaticJsonDocument<256> recieved;
+    deserializeJson(recieved, recievedmsg);
+    String type = recieved["type"];  
+
+    if (type == "handshakerequest") 
+    {
+        respondHandShake(from);
+    }
+}
+
+// Node Mesh Callback for recieved messages. 
+void messageRX(uint32_t from, String &recievedmsg) 
 {
     Serial.println(recievedmsg);
 
@@ -124,10 +179,15 @@ void sensornodeMessageRX(uint32_t from, String &recievedmsg)
         String pingID = recieved["data"]["ping"];
         respondPing(pingID);
     }
+    else if (type == "handshakeresponse") 
+    {
+        uint32_t controlnode = recieved["data"]["control"];
+        CONTROLNODE = controlnode;
+    }
 }
 
-// Sensor Node Mesh Callback for new connections to the mesh
-void sensornodeNewConnection(uint32_t nodeID) 
+// Node Mesh Callback for new connections to the mesh
+void newConnection(uint32_t nodeID) 
 {
     StaticJsonDocument<256> message;
 
@@ -146,8 +206,8 @@ void sensornodeNewConnection(uint32_t nodeID)
     Serial.println(msg);
 }
 
-// Sensor Node Mesh Callback for modified connection messages
-void sensornodeChangedConnection() 
+// Node Mesh Callback for modified connection messages
+void changedConnection() 
 {
     StaticJsonDocument<256> message;
 
@@ -165,8 +225,8 @@ void sensornodeChangedConnection()
     Serial.println(msg);
 }
 
-// Sensor Node Mesh Callback for node time adjustment messages
-void sensornodeNodeTimeAdjust(int32_t offset) 
+// Node Mesh Callback for node time adjustment messages
+void nodeTimeAdjust(int32_t offset) 
 {
     StaticJsonDocument<256> message;
 
@@ -186,108 +246,125 @@ void sensornodeNodeTimeAdjust(int32_t offset)
     Serial.println(msg);
 }
 
-// Control Node Mesh Callback for recieved messages. 
-void controlnodeMessageRX(uint32_t from, String &recievedmsg) 
+// A function to read incoming serial messages
+void readIncoming()
 {
-    serialport.println(recievedmsg);
-}
+    if (Serial.available())
+    {
+        StaticJsonDocument<300> doc;
+        DeserializationError err = deserializeJson(doc, Serial);
 
-// Control Node Mesh Callback for new connections to the mesh
-void controlnodeNewConnection(uint32_t nodeID) 
-{
-    StaticJsonDocument<256> message;
+        if (err == DeserializationError::Ok) {
+            // Print the values
+            // (we must use as<T>() to resolve the ambiguity)
+            Serial.print("timestamp = ");
+            Serial.println(doc["timestamp"].as<long>());
+            Serial.print("value = ");
+            Serial.println(doc["value"].as<String>());
+        } 
+        else {
+            // Print error to the "debug" serial port
+            Serial.print("deserializeJson() returned ");
+            Serial.println(err.c_str());
+        
+            // Flush all bytes in the "link" serial port buffer
+            while (Serial.available() > 0) {
+                Serial.read();
+            }
+        }  
+    }
     
-    message["type"] = "meshupdate";
-    message["origin"] = mesh.getNodeId();
 
-    message["reach"]["type"] = "internal";
-    message["reach"]["set"] = "null";
+    // if (serialbuffer > 0)
+    // {
+    //     String data;
+    //     char bytedata;
 
-    message["data"]["change"] = "newconnection";
-    message["data"]["message"] = "New Node on Mesh";
-    message["data"]["newnode"] = nodeID;
+    //     for (int i = 0; i < serialbuffer; i++)
+    //     {
+    //         bytedata = serialport.read();
+    //         data = data+bytedata;
+    //     }
 
-    String msg;
-    serializeJson(message, msg);
-    serialport.println(msg);
+    //     checkIncoming(data);
+    // }    
 }
 
-// Control Node Mesh Callback for modified connection messages
-void controlnodeChangedConnection() 
+// A function that checks the 'MESHCONNECTED'  
+// variable and flips an LED accordingly.
+void setConnectionLED() 
 {
-    StaticJsonDocument<256> message;
-    
-    message["type"] = "meshupdate";
-    message["origin"] = mesh.getNodeId();
-
-    message["reach"]["type"] = "internal";
-    message["reach"]["set"] = "null";
-
-    message["data"]["change"] = "changedconnection";
-    message["data"]["message"] = "Mesh Connections Modified";
-
-    String msg;
-    serializeJson(message, msg);
-    serialport.println(msg);
+    if (MESHCONNECTED == true) {
+        digitalWrite(16, LOW);
+    } else {
+        digitalWrite(16, HIGH);
+    }
 }
 
-// Control Node Mesh Callback for node time adjustment messages
-void controlnodeNodeTimeAdjust(int32_t offset) 
+// A function to check if the node is connected to
+// the control node and send a handshake otherwise.
+void checkConnection() 
 {
-    StaticJsonDocument<256> message;
-    
-    message["type"] = "meshupdate";
-    message["origin"] = mesh.getNodeId();
-
-    message["reach"]["type"] = "internal";
-    message["reach"]["set"] = "null";
-
-    message["data"]["change"] = "nodetimeadjust";
-    message["data"]["message"] = "Node Time Adjusted";
-    message["data"]["nodetime"] = mesh.getNodeTime();
-    message["data"]["offset"] = offset;
-
-    String msg;
-    serializeJson(message, msg);
-    serialport.println(msg);
+    if (CONTROLNODE > 0) {
+        MESHCONNECTED = mesh.isConnected(CONTROLNODE);
+    } 
+    else if (handshaketimer < 10) {
+        handshaketimer++;
+    }
+    else if (handshaketimer == 10) {
+        requestHandShake();
+        handshaketimer = 0;
+    }
 }
+
+// A function that checks the pingerbutton for a press 
+// and calls the 'requestPing' method.
+void checkPINGER() {
+    pingerbutton.read();
+    if (pingerbutton.wasReleased()) {
+        String pingID = String(random(0,9999));
+        requestPing(pingID);
+    }
+}
+
 
 // FyrNode Constructor
 FyrNode::FyrNode() {
     mesh.setDebugMsgTypes(ERROR|STARTUP);
-    mesh.onReceive(&sensornodeMessageRX);
-    mesh.onNewConnection(&sensornodeNewConnection);
-    mesh.onChangedConnections(&sensornodeChangedConnection);
-    mesh.onNodeTimeAdjusted(&sensornodeNodeTimeAdjust);
+    mesh.onReceive(&messageRX);
+    mesh.onNewConnection(&newConnection);
+    mesh.onChangedConnections(&changedConnection);
+    mesh.onNodeTimeAdjusted(&nodeTimeAdjust);
 }
 
 void FyrNode::begin() {
     Serial.begin(38400);
+    mesh.init(MESH_SSID, MESH_PSWD, &meshScheduler, MESH_PORT);
 
     if (DHTTYP > 0) {dht.begin();}
     if (GASTYP > 0) {pinMode(GASPIN, INPUT);}
     if (FLMTYP > 0) {pinMode(FLMPIN, INPUT);}
-
-    mesh.init(MESH_SSID, MESH_PSWD, &meshScheduler, MESH_PORT);
-    CONTROLNODE = 3160379558;
+    pinMode(16, OUTPUT);
 }
 
 void FyrNode::update() {
     mesh.update();
+    checkConnection();
+    setConnectionLED();
+    
 }
 
 //FyrNodeControl Constructor
 FyrNodeControl::FyrNodeControl() {
     mesh.setDebugMsgTypes(ERROR|STARTUP);
-    mesh.onReceive(&controlnodeMessageRX);
-    mesh.onNewConnection(&controlnodeNewConnection);
-    mesh.onChangedConnections(&controlnodeChangedConnection);
-    mesh.onNodeTimeAdjusted(&controlnodeNodeTimeAdjust);
+    mesh.onReceive(&messageRXControl);
+    mesh.onNewConnection(&newConnection);
+    mesh.onChangedConnections(&changedConnection);
+    mesh.onNodeTimeAdjusted(&nodeTimeAdjust);
 }
 
 void FyrNodeControl::begin() {
     Serial.begin(38400);
-    serialport.begin(38400);
 
     if (CONNECT == true) {connectbutton.begin();}
     if (PINGER == true) {pingerbutton.begin();}
@@ -299,11 +376,6 @@ void FyrNodeControl::begin() {
 void FyrNodeControl::update() {
     mesh.update();
 
-    if (PINGER == true) {
-        pingerbutton.read();
-        if (pingerbutton.wasReleased()) {
-            String pingID = String(random(0,9999));
-            requestPing(pingID);
-        }
-    }
+    readIncoming();
+    if (PINGER == true) {checkPINGER();}
 }
