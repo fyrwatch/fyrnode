@@ -1,5 +1,5 @@
 # FyrNode Library  
-![FyrNode Banner](../fyrnode_banner.png)
+![FyrNode Banner](../fyrnode.png)
 
 **Version: 0.1.0**  
 **Platform: Arduino ESP8266**  

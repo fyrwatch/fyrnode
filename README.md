@@ -1,5 +1,5 @@
 # FyrNode
-![FyrNode Banner](fyrnode_banner.png)
+![FyrNode Banner](fyrnode.png)
 ## A firmware library to design, configure and deploy nodes on the FyrMesh Platform.  
 
 **Version: 0.1.0**  
