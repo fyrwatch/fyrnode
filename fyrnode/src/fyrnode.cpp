@@ -397,7 +397,7 @@ void meshcallback_changedconnection()
     logdoc["nodeID"] = mesh.getNodeId();
     logdoc["nodetime"] = mesh.getNodeTime();
     // Fill in the meshlog values
-    logdoc["logdata"]["type"] = "changeconnection";
+    logdoc["logdata"]["type"] = "changedconnection";
     logdoc["logdata"]["message"] = "Mesh Connections Modified";
     // Log the document to the Serial port.
     serializeJson(logdoc, Serial); Serial.println();
@@ -666,7 +666,7 @@ void FyrNode::update()
     // Check the Mesh Connection Status
     checkmeshconnection();
     // Set the connection LED
-    setconnectionLED()
+    setconnectionLED();
     // Check Pinger Button
     if (PINGER == true) {checkbutton_pinger();}
 }
@@ -691,6 +691,8 @@ void FyrNodeControl::begin()
     Serial.begin(SERIALBAUD);
     // Initialise the Mesh AP
     mesh.init(MESH_SSID, MESH_PSWD, &meshScheduler, MESH_PORT);
+    // Set the Connection LED Pin to Output
+    pinMode(CONNECTLEDPIN, OUTPUT);
     // Set Mesh Variables
     MESHCONTROLNODE = mesh.getNodeId();
     // Initialise the Button objects
@@ -705,7 +707,7 @@ void FyrNodeControl::update()
     // Check for messages from controller
     checkcontrollermessages();
     // Set the connection LED
-    setconnectionLED()
+    setconnectionLED();
     // Check Pinger Button
     if (PINGER == true) {checkbutton_controlnode_pinger();}
 }
