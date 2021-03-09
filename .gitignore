@@ -33,3 +33,6 @@
 
 # VSCode Related
 **/.vscode/
+
+# Custom
+**/testbench/
