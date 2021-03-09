@@ -2,7 +2,7 @@
 ![FyrNode Banner](fyrnode.png)
 ## A firmware library to design, configure and deploy nodes on the FyrMesh Platform.  
 
-**Version: 0.1.0**  
+**Version: 0.2.0**  
 **Platform: Arduino ESP8266**  
 **Language: Arduino C/C++**
 
