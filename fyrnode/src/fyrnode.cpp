@@ -136,10 +136,39 @@ void handlecommand_readsensors(String pingid)
 }
 
 
-//unimplemented
+/*
+A command handler that responds to the command 'readconfig'.
+The runtime fills in the configuration values from the hardware configuration values,
+wraps it into a 'configdata' message and sends it to the MESHCONTROLNODE.
+*/
 void handlecommand_readconfig(String pingid) 
 {
-    // A function to handle the 'readconfig' command.
+    // Create the sensordata document
+    DynamicJsonDocument configdata(512);
+    configdata["type"] = "message";
+    configdata["origin"] = mesh.getNodeId();
+    // Set the reach parameters to unicast with the Control Node as the destination
+    configdata["reach"]["type"] = "unicast";
+    configdata["reach"]["destination"] = MESHCONTROLNODE;
+    // Fill in the ping ID and set the message type.
+    configdata["data"]["ping"] = pingid;
+    configdata["data"]["type"] = "configdata";
+
+    // Fill in the sensor configuration values
+    configdata["data"]["config"]["DHTTYP"] = DHTTYP;
+    configdata["data"]["config"]["DHTPIN"] = DHTPIN;
+    configdata["data"]["config"]["GASTYP"] = GASTYP;
+    configdata["data"]["config"]["GASPIN"] = GASPIN;
+    configdata["data"]["config"]["FLMTYP"] = FLMTYP;
+    configdata["data"]["config"]["FLMPIN"] = FLMPIN;
+    // Fill in the other hardware configuration values
+    configdata["data"]["config"]["PINGER"] = PINGER;
+    configdata["data"]["config"]["PINGERPIN"] = PINGERPIN;
+    configdata["data"]["config"]["SERIALBAUD"] = SERIALBAUD;
+    configdata["data"]["config"]["CONNECTLEDPIN"] = CONNECTLEDPIN;
+
+    // Transmit the sensordata
+    sendmeshmessage(configdata);
 }
 
 
@@ -206,7 +235,7 @@ void handlemessage_handshake(DynamicJsonDocument handshakemessage)
         // Transmit the handshakeACK
         sendmeshmessage(handshakeACK);
 
-        //configdata request code would come here.
+        //TODO: configdata request code would come here.
 
         // Create the meshlog document
         StaticJsonDocument<256> logdoc;
@@ -276,7 +305,10 @@ void handlemessage_sensordata(DynamicJsonDocument sensordata)
     }
 }
 
-
+/*
+A message handler triggered when a 'configdata' message is recieved by the node.
+Reads the message and logs a meshlog of type 'configdata' to the Serial.
+*/
 void handlemessage_configdata(DynamicJsonDocument configdata)
 {
     // Validate the message type to be a 'configdata'
@@ -294,7 +326,7 @@ void handlemessage_configdata(DynamicJsonDocument configdata)
         logdoc["logdata"]["message"] = "config data received";
         logdoc["logdata"]["node"] = nodeID;
         logdoc["logdata"]["ping"] = pingid;
-        logdoc["logdata"]["config"] = sensordata["data"]["config"];
+        logdoc["logdata"]["config"] = configdata["data"]["config"];
         // Log the document to the Serial port.
         serializeJson(logdoc, Serial); Serial.println();
     }
