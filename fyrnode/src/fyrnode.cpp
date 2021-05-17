@@ -13,6 +13,7 @@
 #include "ArduinoJson.h"
 #include "JC_Button.h"
 #include "DHT.h"
+#include "String"
 
 // Mesh AP Configuration Values
 extern String MESH_SSID;
@@ -153,6 +154,8 @@ void handlecommand_readconfig(String pingid)
     // Fill in the ping ID and set the message type.
     configdata["data"]["ping"] = pingid;
     configdata["data"]["type"] = "configdata";
+    // Fill in the node ID
+    configdata["data"]["nodeid"] = mesh.getNodeId();
 
     // Fill in the sensor configuration values
     configdata["data"]["config"]["DHTTYP"] = DHTTYP;
@@ -169,6 +172,12 @@ void handlecommand_readconfig(String pingid)
 
     // Transmit the sensordata
     sendmeshmessage(configdata);
+}
+
+
+void handlecontrolcommand_readconfig() 
+{
+    //unimplemented
 }
 
 
@@ -335,13 +344,24 @@ void handlemessage_configdata(DynamicJsonDocument configdata)
 
 /*
 A command sender for the 'readsensors' command. 
-Generates random 5-digit numeric ping ID and transmits it along with with the command in a 'meshcommand' message.
-If node argument passed is 0, the command is sent in broadcast mode i.e to all the nodes. Otherwise, it is sent only to nodeID that is passed.
+
+If node argument passed is 0, the command is sent in broadcast mode i.e to all the nodes. 
+Otherwise, it is sent only to nodeID that is passed in unicast mode.
+
+If the pingid argument is "control", the command will generate a new pingid in the format 'controlping-<random 6 digit number>' and similarly,
+If the pingid argument is "remote", the command will generate a new pingid in the format 'remoteping-<random 6 digit number>'.
+For all other value of pingid, it is used as it for the consequent ping command.
 */
-void sendcommand_readsensors(uint32_t node) 
+void sendcommand_readsensors(uint32_t node, String pingid) 
 {
-    // Generate a random ping ID  
-    String pingid = String(random(100000,999999));
+    // Check if a pingid needs to be generated
+    if (pingid == "control") {
+        // Generate a random ping ID for control node pings.
+        pingid = "controlping" + String(random(100000,999999));
+    } else if (pingid == "remote") {
+        // Generate a randome ping ID for remote node pings.
+        pingid = "remoteping" + String(random(100000,999999));
+    }
 
     // Create command document
     DynamicJsonDocument requestsensordata(512); 
@@ -369,12 +389,24 @@ void sendcommand_readsensors(uint32_t node)
 
 /*
 A command sender for the 'readconfig' command.
-Generates random 5-digit numeric ping ID and transmits it along with with the command in a 'meshcommand' message.
-If node argument passed is 0, the command is sent in broadcast mode i.e to all the nodes. Otherwise, it is sent only to nodeID that is passed.
+
+If node argument passed is 0, the command is sent in broadcast mode i.e to all the nodes. 
+Otherwise, it is sent only to nodeID that is passed in unicast mode.
+
+If the pingid argument is "control", the command will generate a new pingid in the format 'controlping-<random 6 digit number>' and similarly,
+If the pingid argument is "remote", the command will generate a new pingid in the format 'remoteping-<random 6 digit number>'.
+For all other value of pingid, it is used as it for the consequent ping command.
 */
-void sendcommand_readconfig(uint32_t node)
+void sendcommand_readconfig(uint32_t node, String pingid)
 {
-    String pingid = String(random(100000,999999));
+    // Check if a pingid needs to be generated
+    if (pingid == "control") {
+        // Generate a random ping ID for control node pings.
+        pingid = "controlping" + String(random(100000,999999));
+    } else if (pingid == "remote") {
+        // Generate a randome ping ID for remote node pings.
+        pingid = "remoteping" + String(random(100000,999999));
+    }
 
     DynamicJsonDocument requestconfigdata(512); 
     requestconfigdata["type"] = "message";
@@ -416,27 +448,33 @@ void handlecontrolcommand(DynamicJsonDocument controlcommand)
         MESHCONNECTED = false;
     }
     else if (command == "readsensors-mesh") {
+        // Detect the ping ID
+        String pingid = controlcommand["ping"].as<String>();
         // Send the 'readsensor' command in broadcast mode
-        sendcommand_readsensors(0);
+        sendcommand_readsensors(0, pingid);
     }
     else if (command == "readsensors-node") {
-        // Detect the destination node
+        // Detect the destination node and ping ID
         uint32_t node = controlcommand["node"].as<uint32_t>();
+        String pingid = controlcommand["ping"].as<String>();
         // Send the 'readsensor' command in unicast mode
-        sendcommand_readsensors(node);
+        sendcommand_readsensors(node, pingid);
     }
     else if (command == "readconfig-mesh") {
+        // Detect the ping ID
+        String pingid = controlcommand["ping"].as<String>();
         // Send the 'readconfig' command
-        sendcommand_readconfig(0);
+        sendcommand_readconfig(0, pingid);
     }
     else if (command == "readconfig-node") {
-        // Detect the destination node
+        // Detect the destination node and ping ID
         uint32_t node = controlcommand["node"].as<uint32_t>();
+        String pingid = controlcommand["ping"].as<String>();
         // Send the 'readconfig' command
-        sendcommand_readconfig(0);
+        sendcommand_readconfig(0, pingid);
     }
     else if (command == "readconfig-control") {
-        sendcommand_readconfig(1);
+        handlecontrolcommand_readconfig();
     }
 }
 
@@ -595,14 +633,14 @@ void meshcallback_controlnode_messagerx(uint32_t from, String &receivedmessage)
 A button check runtime that reads the button attached to PINGERPIN on any node.
 Sends the 'readsensors' command if the button has been pressed.
 */
-void checkbutton_pinger() {
+void checkbutton_pinger(String pingertype) {
     // Read the button status
     pingerButton.read();
 
     // On button press
     if (pingerButton.wasReleased()) {
         // Send the 'readsensor' command
-        sendcommand_readsensors(0);
+        sendcommand_readsensors(0, pingertype);
     }
 }
 
@@ -742,7 +780,7 @@ void FyrNode::update()
     // Set the connection LED
     setconnectionLED();
     // Check Pinger Button
-    if (PINGER == true) {checkbutton_pinger();}
+    if (PINGER == true) {checkbutton_pinger("remote");}
 }
 
 
@@ -783,5 +821,5 @@ void FyrNodeControl::update()
     // Set the connection LED
     setconnectionLED();
     // Check Pinger Button
-    if (PINGER == true) {checkbutton_pinger();}
+    if (PINGER == true) {checkbutton_pinger("control");}
 }
