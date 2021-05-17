@@ -111,7 +111,7 @@ A command handler that responds to the command 'readsensors'.
 The runtime fills in the sensor readings based on the hardware configuration values, 
 wraps it into a 'sensordata' message and sends it to the MESHCONTROLNODE.
 */
-void handlecommand_readsensors(String poll) 
+void handlecommand_readsensors(String pingid) 
 {
     // Create the sensordata document
     DynamicJsonDocument sensordata(512);
@@ -120,8 +120,8 @@ void handlecommand_readsensors(String poll)
     // Set the reach parameters to unicast with the Control Node as the destination
     sensordata["reach"]["type"] = "unicast";
     sensordata["reach"]["destination"] = MESHCONTROLNODE;
-    // Fill in the poll ID and set the message type.
-    sensordata["data"]["poll"] = poll;
+    // Fill in the ping ID and set the message type.
+    sensordata["data"]["ping"] = pingid;
     sensordata["data"]["type"] = "sensordata";
 
     // Fill in sensordata readings for DHT
@@ -137,7 +137,7 @@ void handlecommand_readsensors(String poll)
 
 
 //unimplemented
-void handlecommand_readconfig(String poll) 
+void handlecommand_readconfig(String pingid) 
 {
     // A function to handle the 'readconfig' command.
 }
@@ -168,12 +168,12 @@ void handlemessage_meshcommand(DynamicJsonDocument commandmessage)
 
         // Call the appropriate command handler runtime.
         if (command == "readsensors") {
-            String poll = commandmessage["data"]["poll"];
-            handlecommand_readsensors(poll);
+            String pingid = commandmessage["data"]["ping"];
+            handlecommand_readsensors(pingid);
         }
         else if (command == "readconfig") {
-            String poll = commandmessage["data"]["poll"];
-            handlecommand_readconfig(poll);
+            String pingid = commandmessage["data"]["ping"];
+            handlecommand_readconfig(pingid);
         }
     }
 }
@@ -258,7 +258,7 @@ void handlemessage_sensordata(DynamicJsonDocument sensordata)
     // Validate the message type to be a 'sensordata'
     if (sensordata["data"]["type"] == "sensordata") {
         uint32_t nodeID = sensordata["origin"].as<uint32_t>();
-        String poll = sensordata["data"]["poll"];
+        String pingid = sensordata["data"]["ping"];
 
         // Create the meshlog document
         StaticJsonDocument<256> logdoc;
@@ -269,8 +269,32 @@ void handlemessage_sensordata(DynamicJsonDocument sensordata)
         logdoc["logdata"]["type"] = "sensordata";
         logdoc["logdata"]["message"] = "sensor data received";
         logdoc["logdata"]["node"] = nodeID;
-        logdoc["logdata"]["poll"] = poll;
+        logdoc["logdata"]["ping"] = pingid;
         logdoc["logdata"]["sensors"] = sensordata["data"]["sensors"];
+        // Log the document to the Serial port.
+        serializeJson(logdoc, Serial); Serial.println();
+    }
+}
+
+
+void handlemessage_configdata(DynamicJsonDocument configdata)
+{
+    // Validate the message type to be a 'configdata'
+    if (configdata["data"]["type"] == "configdata") {
+        uint32_t nodeID = configdata["origin"].as<uint32_t>();
+        String pingid = configdata["data"]["ping"];
+
+        // Create the meshlog document
+        StaticJsonDocument<256> logdoc;
+        logdoc["type"] = "meshlog";
+        logdoc["nodeID"] = mesh.getNodeId();
+        logdoc["nodetime"] = mesh.getNodeTime();
+        // Fill in the meshlog values
+        logdoc["logdata"]["type"] = "configdata";
+        logdoc["logdata"]["message"] = "config data received";
+        logdoc["logdata"]["node"] = nodeID;
+        logdoc["logdata"]["ping"] = pingid;
+        logdoc["logdata"]["config"] = sensordata["data"]["config"];
         // Log the document to the Serial port.
         serializeJson(logdoc, Serial); Serial.println();
     }
@@ -279,13 +303,13 @@ void handlemessage_sensordata(DynamicJsonDocument sensordata)
 
 /*
 A command sender for the 'readsensors' command. 
-Generates random 5-digit numeric poll ID and transmits it along with with the command in a 'meshcommand' message.
+Generates random 5-digit numeric ping ID and transmits it along with with the command in a 'meshcommand' message.
 If node argument passed is 0, the command is sent in broadcast mode i.e to all the nodes. Otherwise, it is sent only to nodeID that is passed.
 */
 void sendcommand_readsensors(uint32_t node) 
 {
-    // Generate a random poll ID  
-    String poll = String(random(10000,99999));
+    // Generate a random ping ID  
+    String pingid = String(random(100000,999999));
 
     // Create command document
     DynamicJsonDocument requestsensordata(512); 
@@ -304,7 +328,7 @@ void sendcommand_readsensors(uint32_t node)
     requestsensordata["data"]["type"] = "meshcommand";
     requestsensordata["data"]["command"] = "readsensors";
     requestsensordata["data"]["message"] = "sensor data requested";
-    requestsensordata["data"]["poll"] = poll;
+    requestsensordata["data"]["ping"] = pingid;
 
     // Transmit the command
     sendmeshmessage(requestsensordata);
@@ -313,13 +337,34 @@ void sendcommand_readsensors(uint32_t node)
 
 /*
 A command sender for the 'readconfig' command.
-Generates random 5-digit numeric poll ID and transmits it along with with the command in a 'meshcommand' message.
+Generates random 5-digit numeric ping ID and transmits it along with with the command in a 'meshcommand' message.
 If node argument passed is 0, the command is sent in broadcast mode i.e to all the nodes. Otherwise, it is sent only to nodeID that is passed.
 */
 void sendcommand_readconfig(uint32_t node)
 {
-    // unimplemented
-}
+    String pingid = String(random(100000,999999));
+
+    DynamicJsonDocument requestconfigdata(512); 
+    requestconfigdata["type"] = "message";
+    requestconfigdata["origin"] = mesh.getNodeId();
+
+    if (node == 0) {
+        // If value of node is 0, set the reach to 'broadcast'
+        requestconfigdata["reach"]["type"] = "broadcast";
+    } else {
+        // If value of node is passed, set it as the destination for a 'unicast' reach
+        requestconfigdata["reach"]["type"] = "unicast";
+        requestconfigdata["reach"]["destination"] = node;
+    }
+
+    // Fill in the command values and metadata
+    requestconfigdata["data"]["type"] = "meshcommand";
+    requestconfigdata["data"]["command"] = "readconfig";
+    requestconfigdata["data"]["message"] = "config data requested";
+    requestconfigdata["data"]["ping"] = pingid;
+
+    sendmeshmessage(requestconfigdata);
+}   
 
 
 /*
@@ -357,6 +402,9 @@ void handlecontrolcommand(DynamicJsonDocument controlcommand)
         uint32_t node = controlcommand["node"].as<uint32_t>();
         // Send the 'readconfig' command
         sendcommand_readconfig(0);
+    }
+    else if (command == "readconfig-control") {
+        sendcommand_readconfig(1);
     }
 }
 
@@ -491,6 +539,10 @@ void meshcallback_controlnode_messagerx(uint32_t from, String &receivedmessage)
         // Call the 'sensordata' message handler
         handlemessage_sensordata(message);
     }
+    else if (messagetype == "configdata") {
+        // Call the 'configdata' message handler
+        handlemessage_configdata(message);
+    }
     else {
         // Create the meshlog document for the message of unknowntype
         StaticJsonDocument<256> logdoc;
@@ -508,10 +560,10 @@ void meshcallback_controlnode_messagerx(uint32_t from, String &receivedmessage)
 
 
 /*
-A button check runtime that reads the button attached to PINGERPIN on control nodes.
+A button check runtime that reads the button attached to PINGERPIN on any node.
 Sends the 'readsensors' command if the button has been pressed.
 */
-void checkbutton_controlnode_pinger() {
+void checkbutton_pinger() {
     // Read the button status
     pingerButton.read();
 
@@ -520,16 +572,6 @@ void checkbutton_controlnode_pinger() {
         // Send the 'readsensor' command
         sendcommand_readsensors(0);
     }
-}
-
-
-/*
-A button check runtime that reads the button attached to PINGERPIN on sensor nodes.
-Sends the ....
-*/
-void checkbutton_pinger() 
-{
-    // unimplemented
 }
 
 
@@ -709,5 +751,5 @@ void FyrNodeControl::update()
     // Set the connection LED
     setconnectionLED();
     // Check Pinger Button
-    if (PINGER == true) {checkbutton_controlnode_pinger();}
+    if (PINGER == true) {checkbutton_pinger();}
 }
