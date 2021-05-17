@@ -115,7 +115,7 @@ wraps it into a 'sensordata' message and sends it to the MESHCONTROLNODE.
 void handlecommand_readsensors(String pingid) 
 {
     // Create the sensordata document
-    DynamicJsonDocument sensordata(512);
+    DynamicJsonDocument sensordata(1024);
     sensordata["type"] = "message";
     sensordata["origin"] = mesh.getNodeId();
     // Set the reach parameters to unicast with the Control Node as the destination
@@ -145,7 +145,7 @@ wraps it into a 'configdata' message and sends it to the MESHCONTROLNODE.
 void handlecommand_readconfig(String pingid) 
 {
     // Create the sensordata document
-    DynamicJsonDocument configdata(512);
+    DynamicJsonDocument configdata(1024);
     configdata["type"] = "message";
     configdata["origin"] = mesh.getNodeId();
     // Set the reach parameters to unicast with the Control Node as the destination
@@ -175,10 +175,15 @@ void handlecommand_readconfig(String pingid)
 }
 
 
+/*
+A control command handler that responds to the control command 'readconfig-control'.
+Accumulates the relevant configuration values for the hardware and mesh into a 
+meshlog of type 'controlconfigdata' and logs it to the Serial.
+*/
 void handlecontrolcommand_readconfig() 
 {
     // Create the meshlog document
-    StaticJsonDocument<256> logdoc;
+    StaticJsonDocument<1024> logdoc;
     logdoc["type"] = "meshlog";
     logdoc["nodeID"] = mesh.getNodeId();
     logdoc["nodetime"] = mesh.getNodeTime();
@@ -202,6 +207,38 @@ void handlecontrolcommand_readconfig()
     serializeJson(logdoc, Serial); Serial.println();
 }
 
+/*
+A control command handler that responds to the control command 'readnodelist'.
+Accumulates the list of nodes connected to the mesh into a 
+meshlog of type 'controlnodelist' and logs it to the Serial.
+*/
+void handlecontrolcommand_nodelist() 
+{
+    // Create an empty string
+    String strnodelist = "";
+    // Retrieve the list of connected nodes from the mesh
+    std::list<uint32_t> nodelist = mesh.getNodeList();
+    // Accumulate the nodelist into a '-' separated string
+    for (uint32_t i : nodelist) {strnodelist = strnodelist + i + "-";}
+
+    // Create the meshlog document. A DynamicJSONDocument is used
+    // to avoid space limitations as the cluster size increases.
+    DynamicJsonDocument logdoc(1024);
+    logdoc["type"] = "meshlog";
+    logdoc["nodeID"] = mesh.getNodeId();
+    logdoc["nodetime"] = mesh.getNodeTime();
+    // Fill in the meshlog valuesre
+    logdoc["logdata"]["type"] = "controlnodelist";
+    logdoc["logdata"]["message"] = "control nodelist data received";
+    logdoc["logdata"]["node"] = mesh.getNodeId();
+
+    // Attach the nodelist to the meshlog
+    logdoc["logdata"]["nodelist"] = strnodelist;
+
+    // Log the document to the Serial port.
+    serializeJson(logdoc, Serial); Serial.println();
+}
+
 
 /*
 A message handler triggered when a 'meshcommand' message is received by the node. 
@@ -215,7 +252,7 @@ void handlemessage_meshcommand(DynamicJsonDocument commandmessage)
         String command = commandmessage["data"]["command"];
 
         // Create the meshlog document
-        StaticJsonDocument<256> logdoc;
+        StaticJsonDocument<512> logdoc;
         logdoc["type"] = "meshlog";
         logdoc["nodeID"] = mesh.getNodeId();
         logdoc["nodetime"] = mesh.getNodeTime();
@@ -269,7 +306,7 @@ void handlemessage_handshake(DynamicJsonDocument handshakemessage)
         //TODO: configdata request code would come here.
 
         // Create the meshlog document
-        StaticJsonDocument<256> logdoc;
+        StaticJsonDocument<512> logdoc;
         logdoc["type"] = "meshlog";
         logdoc["nodeID"] = mesh.getNodeId();
         logdoc["nodetime"] = mesh.getNodeTime();
@@ -295,7 +332,7 @@ void handlemessage_handshakeACK(DynamicJsonDocument handshakemessage)
         MESHCONTROLNODE = handshakemessage["data"]["controlnode"].as<uint32_t>();
 
         // Create the meshlog document
-        StaticJsonDocument<256> logdoc;
+        StaticJsonDocument<512> logdoc;
         logdoc["type"] = "meshlog";
         logdoc["nodeID"] = mesh.getNodeId();
         logdoc["nodetime"] = mesh.getNodeTime();
@@ -321,7 +358,7 @@ void handlemessage_sensordata(DynamicJsonDocument sensordata)
         String pingid = sensordata["data"]["ping"];
 
         // Create the meshlog document
-        StaticJsonDocument<256> logdoc;
+        StaticJsonDocument<1024> logdoc;
         logdoc["type"] = "meshlog";
         logdoc["nodeID"] = mesh.getNodeId();
         logdoc["nodetime"] = mesh.getNodeTime();
@@ -348,7 +385,7 @@ void handlemessage_configdata(DynamicJsonDocument configdata)
         String pingid = configdata["data"]["ping"];
 
         // Create the meshlog document
-        StaticJsonDocument<256> logdoc;
+        StaticJsonDocument<1024> logdoc;
         logdoc["type"] = "meshlog";
         logdoc["nodeID"] = mesh.getNodeId();
         logdoc["nodetime"] = mesh.getNodeTime();
@@ -498,6 +535,9 @@ void handlecontrolcommand(DynamicJsonDocument controlcommand)
     else if (command == "readconfig-control") {
         handlecontrolcommand_readconfig();
     }
+    else if (command == "readnodelist-control") {
+        handlecontrolcommand_nodelist();
+    }
 }
 
 
@@ -510,7 +550,7 @@ Refer to the API documentation for more information about the 'meshlog' structur
 void meshcallback_newconnection(uint32_t nodeID) 
 {   
     // Create the meshlog document
-    StaticJsonDocument<256> logdoc;
+    StaticJsonDocument<512> logdoc;
     logdoc["type"] = "meshlog";
     logdoc["nodeID"] = mesh.getNodeId();
     logdoc["nodetime"] = mesh.getNodeTime();
@@ -532,7 +572,7 @@ Refer to the API documentation for more information about the 'meshlog' structur
 void meshcallback_changedconnection() 
 {
     // Create the meshlog document
-    StaticJsonDocument<256> logdoc;
+    StaticJsonDocument<512> logdoc;
     logdoc["type"] = "meshlog";
     logdoc["nodeID"] = mesh.getNodeId();
     logdoc["nodetime"] = mesh.getNodeTime();
@@ -553,7 +593,7 @@ Refer to the API documentation for more information about the 'meshlog' structur
 void meshcallback_nodetimeadjust(int32_t offset) 
 {
     // Create the meshlog document
-    StaticJsonDocument<256> logdoc;
+    StaticJsonDocument<512> logdoc;
     logdoc["type"] = "meshlog";
     logdoc["nodeID"] = mesh.getNodeId();
     logdoc["nodetime"] = mesh.getNodeTime();
@@ -593,7 +633,7 @@ void meshcallback_messagerx(uint32_t from, String &receivedmessage)
     }
     else {
         // Create the meshlog document for the message of unknown type
-        StaticJsonDocument<256> logdoc;
+        StaticJsonDocument<512> logdoc;
         logdoc["type"] = "meshlog";
         logdoc["nodeID"] = mesh.getNodeId();
         logdoc["nodetime"] = mesh.getNodeTime();
@@ -637,7 +677,7 @@ void meshcallback_controlnode_messagerx(uint32_t from, String &receivedmessage)
     }
     else {
         // Create the meshlog document for the message of unknowntype
-        StaticJsonDocument<256> logdoc;
+        StaticJsonDocument<512> logdoc;
         logdoc["type"] = "meshlog";
         logdoc["nodeID"] = mesh.getNodeId();
         logdoc["nodetime"] = mesh.getNodeTime();
