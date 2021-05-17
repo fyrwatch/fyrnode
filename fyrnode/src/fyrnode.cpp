@@ -154,9 +154,9 @@ void handlecommand_readconfig(String pingid)
     // Fill in the ping ID and set the message type.
     configdata["data"]["ping"] = pingid;
     configdata["data"]["type"] = "configdata";
-    // Fill in the node ID
-    configdata["data"]["nodeid"] = mesh.getNodeId();
 
+    // Fill in the node id
+    configdata["data"]["config"]["NODEID"] = mesh.getNodeId();
     // Fill in the sensor configuration values
     configdata["data"]["config"]["DHTTYP"] = DHTTYP;
     configdata["data"]["config"]["DHTPIN"] = DHTPIN;
@@ -177,7 +177,29 @@ void handlecommand_readconfig(String pingid)
 
 void handlecontrolcommand_readconfig() 
 {
-    //unimplemented
+    // Create the meshlog document
+    StaticJsonDocument<256> logdoc;
+    logdoc["type"] = "meshlog";
+    logdoc["nodeID"] = mesh.getNodeId();
+    logdoc["nodetime"] = mesh.getNodeTime();
+    // Fill in the meshlog values
+    logdoc["logdata"]["type"] = "controlconfigdata";
+    logdoc["logdata"]["message"] = "control config data received";
+    logdoc["logdata"]["node"] = mesh.getNodeId();
+
+    // Fill in the hardware configuration values
+    logdoc["logdata"]["config"]["PINGER"] = PINGER;
+    logdoc["logdata"]["config"]["PINGERPIN"] = PINGERPIN;
+    logdoc["logdata"]["config"]["SERIALBAUD"] = SERIALBAUD;
+    logdoc["logdata"]["config"]["CONNECTLEDPIN"] = CONNECTLEDPIN;
+    // Fill in the mesh configuration values
+    logdoc["logdata"]["config"]["MESH_SSID"] = MESH_SSID;
+    logdoc["logdata"]["config"]["MESH_PSWD"] = MESH_PSWD;
+    logdoc["logdata"]["config"]["MESH_PORT"] = MESH_PORT;
+    logdoc["logdata"]["config"]["NODEID"] = mesh.getNodeId();
+
+    // Log the document to the Serial port.
+    serializeJson(logdoc, Serial); Serial.println();
 }
 
 
