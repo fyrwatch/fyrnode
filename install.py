@@ -9,28 +9,34 @@ without the express permission of Manish Meganathan and Mariyam A.Ghani
 A python script to install the fyrnode library at the provided target location.
 ===========================================================================
 """
-
 import os
 import sys
 from distutils.dir_util import copy_tree
 
+arguments = sys.argv[1:]
 script_dir = os.path.dirname(os.path.realpath(__file__))
-source_dir = os.path.join(script_dir, "..", "fyrnode")
+source_dir = os.path.join(script_dir, "fyrnode")
 
-if __name__ == "__main__":
-    target_dir = input("Enter target directory to install the library:\n")
+print("[INFO] FyrNode installation is starting.")
 
-    if not os.path.isdir(target_dir):
-        ("invalid target directory. try again!")
-        sys.exit()
+if not arguments:
+    print("[ERROR] target directory for installation was not entered.")
+    sys.exit()
 
-    if not target_dir.endswith("fyrnode"):
-        target_dir = os.path.join(target_dir, "fyrnode")
+target_dir = arguments[0]
 
-    try:
-        copy_tree(source_dir, target_dir)
-    except:
-        print("library install failed!")
-        sys.exit()
+if not os.path.isdir(target_dir):
+    ("[ERROR] target directory entered for installation is invalid. try again!")
+    sys.exit()
 
-    print(f"library install successful at {target_dir}")
+if not target_dir.endswith("fyrnode"):
+    target_dir = os.path.join(target_dir, "fyrnode")
+
+try:
+    copy_tree(source_dir, target_dir)
+
+except:
+    print("[FAIL] FyrNode library install failed!")
+    sys.exit()
+
+print(f"[SUCCESS] FyrNode library successfully installed at {target_dir}")
