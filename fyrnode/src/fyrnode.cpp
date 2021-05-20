@@ -400,6 +400,53 @@ void handlemessage_configdata(DynamicJsonDocument configdata)
     }
 }
 
+/*
+A message handler triggered when 'connectionupdate' message is recieved by the node.
+Reads the message and logs a meshlog of type 'meshsync' with appropriate sync field set to the Serial.
+*/
+void handlemessage_connectionupdate(DynamicJsonDocument connupdate)
+{
+    if (connupdate["data"]["type"] == "connectionupdate") {
+        // Determine the updatetype string from the connupdate
+        String updatetype = connupdate["data"]["type"];
+
+        // Create the meshlog document
+        StaticJsonDocument<512> logdoc;
+        logdoc["type"] = "meshlog";
+        logdoc["nodeID"] = mesh.getNodeId();
+        logdoc["nodetime"] = mesh.getNodeTime();
+        // Fill in the meshlog values
+        logdoc["logdata"]["type"] = "meshsync";
+        logdoc["logdata"]["sync"] = updatetype;
+        logdoc["logdata"]["message"] = "mesh synchronization required";
+        // Log the document to the Serial port.
+        serializeJson(logdoc, Serial); Serial.println();    
+    }
+}
+
+/*
+A message sender for the 'connectionupdate' message.
+
+Sends a message to control node with a field updatetype 
+indicating the type of update to the mesh.
+*/
+void sendmessage_connectionupdate(String updatetype) 
+{   
+    // Create command document
+    DynamicJsonDocument connectionupdate(512); 
+    connectionupdate["type"] = "message";
+    connectionupdate["origin"] = mesh.getNodeId();
+    // Fill in the reach parameters
+    connectionupdate["reach"]["type"] = "unicast";
+    connectionupdate["reach"]["destination"] = MESHCONTROLNODE;
+    // Fill in the message type and updatetype
+    connectionupdate["data"]["type"] = "connectionupdate";
+    connectionupdate["data"]["updatetype"] = updatetype;
+
+    // Transmit the command
+    sendmeshmessage(connectionupdate);
+}
+
 
 /*
 A command sender for the 'readsensors' command. 
@@ -521,7 +568,7 @@ void handlecontrolcommand(DynamicJsonDocument controlcommand)
         uint32_t node = controlcommand["node"].as<uint32_t>();
         String pingid = controlcommand["ping"].as<String>();
         // Send the 'readconfig' command
-        sendcommand_readconfig(0, pingid);
+        sendcommand_readconfig(node, pingid);
     }
     else if (command == "readconfig-control") {
         handlecontrolcommand_readconfig();
@@ -533,34 +580,24 @@ void handlecontrolcommand(DynamicJsonDocument controlcommand)
 
 
 /* 
-A Mesh callback function triggered when there is a new connections to the mesh. 
-This callback is used by both the FyrNode and FyrNodeControl objects. 
-The callback generates a 'meshlog' document of type 'newconnection' and logs it to the Serial.
+A Mesh callback function triggered when there is a new connections to the node. 
+This callback is exclusively used by FyrNode objects.  
+The callback sends a 'connectionupdate' message with updatetype 'newconnection' to mesh control node which handles the mesh synchronization.
 Refer to the API documentation for more information about the 'meshlog' structure.
 */
 void meshcallback_newconnection(uint32_t nodeID) 
 {   
-    // Create the meshlog document
-    StaticJsonDocument<512> logdoc;
-    logdoc["type"] = "meshlog";
-    logdoc["nodeID"] = mesh.getNodeId();
-    logdoc["nodetime"] = mesh.getNodeTime();
-    // Fill in the meshlog values
-    logdoc["logdata"]["type"] = "newconnection";
-    logdoc["logdata"]["message"] = "New Node added on Mesh";
-    logdoc["logdata"]["newnode"] = nodeID;
-    // Log the document to the Serial port.
-    serializeJson(logdoc, Serial); Serial.println();
+    sendmessage_connectionupdate("newconnection");
 }
 
 
 /* 
-A Mesh callback function triggered when there is a change to the connections of the mesh. 
-This callback is used by both the FyrNode and FyrNodeControl objects. 
-The callback generates a 'meshlog' document of type 'changedconnection' and logs it to the Serial.
+A Mesh callback function triggered when there is a new connections to the node. 
+This callback is exclusively used by FyrNodeControl objects. 
+The callback generates a 'meshlog' document of type 'meshsync' with the sync set to 'newconnection' and logs it to the Serial.
 Refer to the API documentation for more information about the 'meshlog' structure.
 */
-void meshcallback_changedconnection() 
+void meshcallback_controlnode_newconnection(uint32_t nodeID)
 {
     // Create the meshlog document
     StaticJsonDocument<512> logdoc;
@@ -568,8 +605,43 @@ void meshcallback_changedconnection()
     logdoc["nodeID"] = mesh.getNodeId();
     logdoc["nodetime"] = mesh.getNodeTime();
     // Fill in the meshlog values
-    logdoc["logdata"]["type"] = "changedconnection";
-    logdoc["logdata"]["message"] = "Mesh Connections Modified";
+    logdoc["logdata"]["type"] = "meshsync";
+    logdoc["logdata"]["sync"] = "newconnection";
+    logdoc["logdata"]["message"] = "new node added on mesh";
+    // Log the document to the Serial port.
+    serializeJson(logdoc, Serial); Serial.println();
+}
+
+
+/* 
+A Mesh callback function triggered when there is a change to the connections of the mesh. 
+This callback is exclusively used by FyrNode objects.  
+The callback sends a 'connectionupdate' message with updatetype 'changedconnection' to mesh control node which handles the mesh synchronization.
+Refer to the API documentation for more information about the 'meshlog' structure.
+*/
+void meshcallback_changedconnection() 
+{
+    sendmessage_connectionupdate("changedconnection");
+}
+
+
+/* 
+A Mesh callback function triggered when there is a change to the connections of the mesh. 
+This callback is exclusively used by FyrNodeControl objects. 
+The callback generates a 'meshlog' document of type 'meshsync' with the sync set to 'changedconnection' and logs it to the Serial.
+Refer to the API documentation for more information about the 'meshlog' structure.
+*/
+void meshcallback_controlnode_changedconnection() 
+{
+    // Create the meshlog document
+    StaticJsonDocument<512> logdoc;
+    logdoc["type"] = "meshlog";
+    logdoc["nodeID"] = mesh.getNodeId();
+    logdoc["nodetime"] = mesh.getNodeTime();
+    // Fill in the meshlog values
+    logdoc["logdata"]["type"] = "meshsync";
+    logdoc["logdata"]["sync"] = "changedconnection";
+    logdoc["logdata"]["message"] = "mesh synchronization required";
     // Log the document to the Serial port.
     serializeJson(logdoc, Serial); Serial.println();
 }
@@ -589,8 +661,8 @@ void meshcallback_nodetimeadjust(int32_t offset)
     logdoc["nodeID"] = mesh.getNodeId();
     logdoc["nodetime"] = mesh.getNodeTime();
     // Fill in the meshlog values
-    logdoc["logdata"]["type"] = "nodetimeadjust";
-    logdoc["logdata"]["message"] = "Node Time Adjusted";
+    logdoc["logdata"]["type"] = "nodesync";
+    logdoc["logdata"]["message"] = "node time adjusted and synchronised";
     logdoc["logdata"]["nodetime"] = mesh.getNodeTime();
     logdoc["logdata"]["offset"] = offset;
     // Log the document to the Serial port.
@@ -630,7 +702,7 @@ void meshcallback_messagerx(uint32_t from, String &receivedmessage)
         logdoc["nodetime"] = mesh.getNodeTime();
         // Fill in the meshlog values
         logdoc["logdata"]["type"] = "messagerx";
-        logdoc["logdata"]["message"] = "Message Received";
+        logdoc["logdata"]["message"] = "message received";
         logdoc["logdata"]["rxtype"] = messagetype;
         // Log the document to the Serial port.
         serializeJson(logdoc, Serial); Serial.println();
@@ -666,6 +738,10 @@ void meshcallback_controlnode_messagerx(uint32_t from, String &receivedmessage)
         // Call the 'configdata' message handler
         handlemessage_configdata(message);
     }
+    else if (messagetype == "connectionupdate") {
+        // Call the 'connectionupdate' message handler
+        handlemessage_connectionupdate(message);
+    }
     else {
         // Create the meshlog document for the message of unknowntype
         StaticJsonDocument<512> logdoc;
@@ -674,7 +750,7 @@ void meshcallback_controlnode_messagerx(uint32_t from, String &receivedmessage)
         logdoc["nodetime"] = mesh.getNodeTime();
         // Fill in the meshlog values
         logdoc["logdata"]["type"] = "messagerx";
-        logdoc["logdata"]["message"] = "Message Received";
+        logdoc["logdata"]["message"] = "message received";
         logdoc["logdata"]["rxtype"] = messagetype;
         // Log the document to the Serial port.
         serializeJson(logdoc, Serial); Serial.println();
@@ -845,8 +921,8 @@ FyrNodeControl::FyrNodeControl()
     mesh.setDebugMsgTypes(ERROR|STARTUP);
     // Set the Mesh Callbacks
     mesh.onReceive(&meshcallback_controlnode_messagerx);
-    mesh.onNewConnection(&meshcallback_newconnection);
-    mesh.onChangedConnections(&meshcallback_changedconnection);
+    mesh.onNewConnection(&meshcallback_controlnode_newconnection);
+    mesh.onChangedConnections(&meshcallback_controlnode_changedconnection);
     mesh.onNodeTimeAdjusted(&meshcallback_nodetimeadjust);
 }
 
