@@ -413,15 +413,6 @@ For all other value of pingid, it is used as it for the consequent ping command.
 */
 void sendcommand_readsensors(uint32_t node, String pingid) 
 {
-    // Check if a pingid needs to be generated
-    if (pingid == "control") {
-        // Generate a random ping ID for control node pings.
-        pingid = "controlping" + String(random(100000,999999));
-    } else if (pingid == "remote") {
-        // Generate a randome ping ID for remote node pings.
-        pingid = "remoteping" + String(random(100000,999999));
-    }
-
     // Create command document
     DynamicJsonDocument requestsensordata(512); 
     requestsensordata["type"] = "message";
@@ -695,14 +686,15 @@ void meshcallback_controlnode_messagerx(uint32_t from, String &receivedmessage)
 A button check runtime that reads the button attached to PINGERPIN on any node.
 Sends the 'readsensors' command if the button has been pressed.
 */
-void checkbutton_pinger(String pingertype) {
+void checkbutton_pinger() {
     // Read the button status
     pingerButton.read();
 
     // On button press
     if (pingerButton.wasReleased()) {
         // Send the 'readsensor' command
-        sendcommand_readsensors(0, pingertype);
+        String pingid = "buttonping-" + String(random(100000,999999));
+        sendcommand_readsensors(0, pingid);
     }
 }
 
@@ -842,7 +834,7 @@ void FyrNode::update()
     // Set the connection LED
     setconnectionLED();
     // Check Pinger Button
-    if (PINGER == true) {checkbutton_pinger("remote");}
+    if (PINGER == true) {checkbutton_pinger();}
 }
 
 
@@ -883,5 +875,5 @@ void FyrNodeControl::update()
     // Set the connection LED
     setconnectionLED();
     // Check Pinger Button
-    if (PINGER == true) {checkbutton_pinger("control");}
+    if (PINGER == true) {checkbutton_pinger();}
 }
