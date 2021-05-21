@@ -408,7 +408,7 @@ void handlemessage_connectionupdate(DynamicJsonDocument connupdate)
 {
     if (connupdate["data"]["type"] == "connectionupdate") {
         // Determine the updatetype string from the connupdate
-        String updatetype = connupdate["data"]["type"];
+        String updatetype = connupdate["data"]["updatetype"];
 
         // Create the meshlog document
         StaticJsonDocument<512> logdoc;
@@ -418,7 +418,7 @@ void handlemessage_connectionupdate(DynamicJsonDocument connupdate)
         // Fill in the meshlog values
         logdoc["logdata"]["type"] = "meshsync";
         logdoc["logdata"]["sync"] = updatetype;
-        logdoc["logdata"]["message"] = "mesh synchronization required";
+        logdoc["logdata"]["message"] = "mesh synchronization event";
         // Log the document to the Serial port.
         serializeJson(logdoc, Serial); Serial.println();    
     }
